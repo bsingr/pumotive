@@ -12,28 +12,12 @@
   <!-- HTML template -->
   <table>
     <tr>
-      <td></td>
+      <td class='red'></td>
+      <td class='green'></td>
     </tr>
   </table>
-
+  <a class='lo'>lala</a>
   <script>
-    var directive = {
-    'tr' : { //trigger a loop
-      'animal<-animals' : { // loop on the property animals in the JSON 
-       '@class+':function(arg){ // add(+) the return value of the function to the class
-        var oddEven, firstLast;
-        oddEven = (arg.pos % 2 == 0) ? ' even' : ' odd';
-        firstLast = (arg.pos == 0) ? 
-         ' first' : 
-         (arg.pos == arg.animal.items.length - 1) ? 
-          ' last' : 
-          '';
-        return oddEven + firstLast;
-       },
-       'td':'animal.name'
-       }
-     }
-    };
 
     var data = {
       animals:[
@@ -44,7 +28,89 @@
       ]
     };
 
-    $('table').render(data, directive);
+    var directive = {
+      'table': {
+        animals: function(context, idx, animal){ return {
+          'tr': {
+            '.red': animal.name
+          }
+        }}
+      }
+    };
+
+    var clone = function(obj) {
+      return eval(uneval(obj));
+    };
+
+    var render = function(context, property) {
+      // TODO support @attr and others..  
+      switch ( context.type.name ) {
+        case 'iterator':
+          if (context.type.size > 1) {
+            $(property).parent().append($(property).clone().html(context.directive[property]));
+          } else {
+            $(property).html(context.directive[property]);
+          }
+          break;
+        default:
+          $(property).html(context.directive[property]);
+          break;
+      }
+    };
+
+    var concatenate = function(context, property) {
+      switch ( typeof(context.directive[property]) ) {
+        case 'string':
+          render(context, property);
+          break;
+        case 'object':
+          var subContext = clone(context);
+          subContext.directive = context.directive[property];
+          compile(subContext);
+          break;
+        case 'function':
+          concatenateFunc(context, property);
+          break;
+        default:
+          console.log('error1');
+          break;
+      }
+    };
+    var concatenateFunc = function(context, property) {
+      if (context.data[property]) {
+        concatenateData(context, property);
+      } else {
+        var subContext = clone(context);
+        subContext.directive = context.directive[property](context);
+        compile(subContext);
+      }
+    };
+    var concatenateData = function(context, property) {
+      var dataObj = context.data[property];
+      // TODO detect scalars,arrays,hashes
+      context.type.name = 'iterator';
+      context.type.size = 0;
+      for (var idx in dataObj) {
+        context.type.size++;
+        var subContext = clone(context);
+        subContext.directive = context.directive[property](context, idx, dataObj[idx]);
+        compile(subContext);
+      }
+    };
+
+    var compile = function(context) {
+      var concatenator = '';
+      for (var property in context.directive) {
+        concatenate(context, property);
+      }
+      return concatenator;
+    }
+
+    $('.lo').click(function(){
+      console.log('start');
+      compile({data: data, directive: directive, type: {name:'', size:0}});
+      console.log('end');
+    });
   </script>
 </body>
 </html>
